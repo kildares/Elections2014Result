@@ -30,6 +30,7 @@
 			var mymap;
 			var resultadoElection = [];
 			var mediaNacional;
+			var partyName = "PV";
 
             //Fetches a JSON file
 			function loadJSON(callback, fileName) {   
@@ -80,7 +81,7 @@
 
             function getCityColor(nome)
 			{
-			    return partidos["PV"][nome];
+			    return partidos[partyName][nome];
 			}
 
             function setMediaNacional()
@@ -95,6 +96,19 @@
                 }
             }
 
+            function getPartyData(cityData, partyName)
+			{
+                for(var j = 6; j  < cityData.length ; j++)
+                {
+					 var party = cityData[j][0];
+					//Necessario pois a lista de partidos nao esta ordenado e para algumas cidades nao ha dados do PV
+					if(party === partyName)
+						return j;
+                }
+                return -1;
+			}
+
+
             //Configures the array resultadoElection
             function setElectionResultColors()
 			{
@@ -102,24 +116,14 @@
 			    {
 					if(election[i][0] !== "UF" && election[i][0] !== "BR")
 					{
-						var pos = -1;
-						for(var j= 6; j  < election[i].length ; j++)
-						{
-						    var party = election[i][j][0];
-							//Necessario pois a lista de partidos nao esta ordenado e para algumas cidades nao ha dados do PV
-							if(party === "PV")
-							{
-							    pos = j;
-								break;
-							}
-						}
-
 						var color;
-						if(pos < 0)
+						var partyPos = getPartyData(election[i], partyName);
+
+						if(partyPos < 0)
                             color = getCityColor("cor_media");
 						else
 						{
-                            var data = election[i][pos];
+                            var data = election[i][partyPos];
 
                             var media = data[3];
                             var plus50 = mediaNacional + (mediaNacional *0.5);

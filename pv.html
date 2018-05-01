@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+	<head>
+	
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	
+	
+	<title>Brazilian Map</title>
+	
+		<link rel="stylesheet" href="https://unpkg.com/leaflet@1.3.1/dist/leaflet.css"
+		integrity="sha512-Rksm5RenBEKSKFjgI3a41vrjkw4EVPlJ3+OiI65vTjIdo9brlAacEuKOiQ5OFh7cOI1bkDwLqdLw3Zg0cRJAAQ=="
+		crossorigin=""/>
+	   
+		<script src="./leaflet/leaflet-src.js"></script>
+		<script src="./jquery/jquery-3.3.1.js"></script>
+		<script src="./topojson/topojson.js"></script>
+		
+		<script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.2.0/leaflet-omnivore.min.js'></script>
+
+	</head>
+	
+	
+	<body>
+		<div id="mapid" style="width: 600px; height: 400px; position: relative;" class="leaflet-container leaflet-touch leaflet-retina leaflet-fade-anim leaflet-grab leaflet-touch-drag leaflet-touch-zoom" tabindex="0">
+		</div>
+		<script>
+
+			var partidos = undefined;
+			var election = undefined;
+			var mymap;
+			var resultadoElection = [];
+			var mediaNacional;
+
+            //Fetches a JSON file
+			function loadJSON(callback, fileName) {   
+
+				var xobj = new XMLHttpRequest();
+				xobj.overrideMimeType("application/json");
+				xobj.open('GET', fileName, true); // Replace 'my_data' with the path to your file
+				xobj.onreadystatechange = function () {
+					if (xobj.readyState == 4 && xobj.status == "200") {
+						// Required use of an anonymous callback as .open will NOT return a value but simply returns undefined in asynchronous mode
+						callback(xobj.responseText);
+					}
+				};
+				xobj.send(null);  
+			}
+			
+			//Loads the party data JSON
+			function loadParties() {
+				loadJSON(function(response) 
+						{
+							var actual_json = JSON.parse(response);
+							partidos = actual_json;
+						}, 
+						"./resources/partidos.json");
+			}
+
+
+			//Loads the election map JSON
+			function loadElectionMap(regionData) {
+                var brLayer =
+					omnivore.topojson(regionData)
+					.on('ready', function ()
+					{
+						brLayer.eachLayer(function (layer) {
+
+							var geoCod = layer.feature.properties.CD_GEOCODM;
+							var color = resultadoElection[geoCod];
+							if(color != undefined)
+							{
+                                layer.bindPopup('Municipio: ' + layer.feature.properties.NM_MUNICIP);
+                                layer.setStyle({fillColor: color, color: color, fill: true, weight: 2});
+							}
+
+						});
+						brLayer.addTo(mymap);
+                });
+            }
+
+            function getCityColor(nome)
+			{
+			    return partidos["PV"][nome];
+			}
+
+            function setMediaNacional()
+            {
+                for(i in election)
+                {
+                    if(election[i][0] == "BR")
+                    {
+                        mediaNacional = election[i][9][3];
+                        break;
+                    }
+                }
+            }
+
+            //Configures the array resultadoElection
+            function setElectionResultColors()
+			{
+			    for(i in election)
+			    {
+					if(election[i][0] !== "UF" && election[i][0] !== "BR")
+					{
+						var pos = -1;
+						for(var j= 6; j  < election[i].length ; j++)
+						{
+						    var party = election[i][j][0];
+							//Necessario pois a lista de partidos nao esta ordenado e para algumas cidades nao ha dados do PV
+							if(party === "PV")
+							{
+							    pos = j;
+								break;
+							}
+						}
+
+						var color;
+						if(pos < 0)
+                            color = getCityColor("cor_media");
+						else
+						{
+                            var data = election[i][pos];
+
+                            var media = data[3];
+                            var plus50 = mediaNacional + (mediaNacional *0.5);
+                            var minus50 = mediaNacional - (mediaNacional *0.5);
+
+                            if(media > plus50)
+                                color = getCityColor("cor_forte");
+                            else if(media < minus50)
+                                color = getCityColor("cor_fraca");
+                            else
+                                color = getCityColor("cor_media");
+						}
+						resultadoElection[election[i][1]] = "#"+color;
+					}
+				}
+			}
+			
+			//Loads the election results JSON
+			function loadElectionResult(electionData)
+			{
+				loadJSON(function(response)
+						{
+							var actual_json = JSON.parse(response);
+							election = actual_json;
+							setMediaNacional();
+							setElectionResultColors();
+						}, 
+						electionData)
+			}
+
+			//Start configuring the map
+			
+			mymap = L.map('mapid').setView([-15.000, -50.000], 5);
+		
+			L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
+					attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
+					maxZoom: 18,
+					id: 'mapbox.streets',
+					accessToken: 'pk.eyJ1Ijoia2lsZGFyZS1zaWx2ZWlyYSIsImEiOiJjamdheDZieDgyZTU5MnlteXd5M253b2JsIn0.DdVdJjjQ8x_06E_gTXzNbA'
+					}).addTo(mymap);
+
+			$("#mapid").height($(window).height()).width($(window).width());
+			mymap.invalidateSize();
+				
+			//Load the data
+			loadParties();
+			loadElectionResult("./resources/resultado-1-turno.json");
+			loadElectionMap("./resources/brasil.json");
+
+		</script>
+	
+	</body>
